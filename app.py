@@ -9,6 +9,9 @@ from aiogram.filters import Command, StateFilter
 from datetime import datetime, timedelta
 import pytz
 
+from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
 from aiogram.types import (
     Message,
     CallbackQuery,
@@ -56,6 +59,13 @@ ADMIN_ID = os.getenv("ADMIN_ID")
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 users = {}
+
+# WEB HOOK CODES
+WEBHOOK_HOST = "https://d691-188-113-215-165.ngrok-free.app"  # ngrok’dan keyin yangilanadi
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
+WEBAPP_PORT = 5000       # Siz tanlagan port
 
 
 def get_admins():
@@ -898,16 +908,30 @@ async def send_scheduled_posts():
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
         
-async def on_startup():
-    asyncio.create_task(send_scheduled_posts())
-async def main():
-    await on_startup()
-    await dp.start_polling(bot)
+# Webhook sozlash uchun startup va shutdown (YANGI)
+app = web.Application()
+webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
+webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+setup_application(app, dp, bot=bot)
 
+async def handle(request):
+    return await webhook_requests_handler.handle(request)
+
+app.router.add_post("/api/webhook", handle)
+app.router.add_get("/api/webhook", handle)  # Vercel uchun GET so‘rovlarini qo‘llab-quvvatlash
+
+# Webhook’ni sozlash
+async def on_startup():
+    await bot.set_webhook(url=WEBHOOK_URL)
+    print(f"Webhook sozlandi: {WEBHOOK_URL}")
+    asyncio.create_task(send_scheduled_posts())
+
+async def on_shutdown():
+    await bot.delete_webhook()
+    print("Webhook o‘chirildi")
+
+dp.startup.register(on_startup)
+dp.shutdown.register(on_shutdown)
 
 if __name__ == "__main__":
-    print("Bot start")
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Botni to'xtatdingiz!")
+    web.run_app(app, host=WEBAPP_HOST, port=WEBAPP_PORT)
