@@ -61,11 +61,11 @@ dp = Dispatcher()
 users = {}
 
 # WEB HOOK CODES
-WEBHOOK_HOST = "https://d691-188-113-215-165.ngrok-free.app"  # ngrok’dan keyin yangilanadi
+WEBHOOK_HOST = "distinct-marlin-islomjon-749afe20.koyeb.app/"  # ngrok’dan keyin yangilanadi
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
-WEBAPP_PORT = 5000       # Siz tanlagan port
+WEBAPP_PORT = 8000       # Siz tanlagan port
 
 
 def get_admins():
