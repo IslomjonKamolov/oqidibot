@@ -49,27 +49,9 @@ from states import (
 import os
 
 load_dotenv()
-
-firebase_credentials = {
-    "type": os.getenv("FIREBASE_TYPE"),
-    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
-    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
-    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
-    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
-    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
-    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
-}
-
-# Firebase’ni ishga tushirish
-cred = credentials.Certificate(firebase_credentials)
-
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = os.getenv("TOKEN")
-# cred = credentials.Certificate("serviceAccount.json")
+cred = credentials.Certificate("serviceAccount.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 ADMIN_ID = os.getenv("ADMIN_ID")
@@ -83,7 +65,7 @@ WEBHOOK_HOST = "distinct-marlin-islomjon-749afe20.koyeb.app/"  # ngrok’dan key
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
-WEBAPP_PORT = int(os.getenv("PORT", 8000))      # Siz tanlagan port
+WEBAPP_PORT = 8000       # Siz tanlagan port
 
 
 def get_admins():
