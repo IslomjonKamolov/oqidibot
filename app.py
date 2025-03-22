@@ -948,5 +948,11 @@ async def on_shutdown():
 dp.startup.register(on_startup)
 dp.shutdown.register(on_shutdown)
 
+async def check_webhook():
+    webhook_info = await bot.get_webhook_info()
+    print(webhook_info)
+
+asyncio.run(check_webhook())
+
 if __name__ == "__main__":
     web.run_app(app, host=WEBAPP_HOST, port=WEBAPP_PORT)
