@@ -9,9 +9,6 @@ from aiogram.filters import Command, StateFilter
 from datetime import datetime, timedelta
 import pytz
 
-from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-
 from aiogram.types import (
     Message,
     CallbackQuery,
@@ -60,26 +57,6 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 users = {}
 
-# WEB HOOK CODES
-WEBHOOK_HOST = "https://your-bot-name.vercel.app"  # Vercel’dan olingan domen
-WEBHOOK_PATH = "/api/webhook"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEBAPP_PORT = int(os.getenv("PORT", 3000))     # Siz tanlagan port
-WEBAPP_HOST = "0.0.0.0"
-
-firebase_credentials = {
-    "type": os.getenv("FIREBASE_TYPE"),
-    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace("\\n", "\n"),
-    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
-    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
-    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
-    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
-    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
-}
 
 def get_admins():
     admins_ref = db.collection("admins").stream()
@@ -921,30 +898,16 @@ async def send_scheduled_posts():
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
         
-# Webhook sozlash uchun startup va shutdown (YANGI)
-app = web.Application()
-webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
-webhook_requests_handler.register(app, path=WEBHOOK_PATH)
-setup_application(app, dp, bot=bot)
-
-async def handle(request):
-    return await webhook_requests_handler.handle(request)
-
-app.router.add_post("/api/webhook", handle)
-app.router.add_get("/api/webhook", handle)  # Vercel uchun GET so‘rovlarini qo‘llab-quvvatlash
-
-# Webhook’ni sozlash
 async def on_startup():
-    await bot.set_webhook(url=WEBHOOK_URL)
-    print(f"Webhook sozlandi: {WEBHOOK_URL}")
     asyncio.create_task(send_scheduled_posts())
+async def main():
+    await on_startup()
+    await dp.start_polling(bot)
 
-async def on_shutdown():
-    await bot.delete_webhook()
-    print("Webhook o‘chirildi")
-
-dp.startup.register(on_startup)
-dp.shutdown.register(on_shutdown)
 
 if __name__ == "__main__":
-    web.run_app(app, host=WEBAPP_HOST, port=WEBAPP_PORT)
+    print("Bot start")
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Botni to'xtatdingiz!")
