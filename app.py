@@ -76,7 +76,7 @@ dp = Dispatcher()
 users = {}
 
 # WEB HOOK CODES
-WEBHOOK_HOST = "distinct-marlin-islomjon-749afe20.koyeb.app"  # ngrok’dan keyin yangilanadi
+WEBHOOK_HOST = "oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
