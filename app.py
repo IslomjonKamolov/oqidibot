@@ -811,7 +811,7 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=12, minute=58, second=30, microsecond=0)
+        today_8_11_uz = now_uz.replace(hour=7, minute=00, second=00, microsecond=0)
         
         if now_uz > today_8_11_uz:
             next_run = today_8_11_uz + timedelta(days=1)
