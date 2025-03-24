@@ -76,7 +76,7 @@ dp = Dispatcher()
 users = {}
 
 # WEB HOOK CODES
-WEBHOOK_HOST = "oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
+WEBHOOK_HOST = "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
@@ -811,7 +811,7 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=7, minute=00, second=00, microsecond=0)
+        today_8_11_uz = now_uz.replace(hour=7, minute=33, second=00, microsecond=0)
         
         if now_uz > today_8_11_uz:
             next_run = today_8_11_uz + timedelta(days=1)
