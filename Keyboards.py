@@ -68,17 +68,16 @@ admin_panel = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="🆕 Yangi postlar qo'shish 🆕"),
-            KeyboardButton(text="📊 Foydalanuvchilar soni 📊")
+            KeyboardButton(text="📊 Foydalanuvchilar soni 📊"),
+            KeyboardButton(text="🗂 Barcha Postlar 🗂")
         ],
         [
             KeyboardButton(text="👤 Yangi admin qo'shish"),
             KeyboardButton(text="📋 Adminlar ro'yxati"),
-        ],
-        [
             KeyboardButton(text="🏙 Rasmli xabar yuborish"),
-            KeyboardButton(text="📝 Userlarga xabar yuborish"),
         ],
         [
+            KeyboardButton(text="📝 Userlarga xabar yuborish"),
             KeyboardButton(text="💢 Paneldan chiqish"),
             KeyboardButton(text="📄 Majburiy obuna ro'yxati"),
         ],

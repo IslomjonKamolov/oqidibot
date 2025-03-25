@@ -22,7 +22,7 @@ from aiogram.types import (
     ChatMemberLeft,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
-    FSInputFile
+    FSInputFile,
 )
 from aiogram.exceptions import TelegramBadRequest
 from Keyboards import (
@@ -44,7 +44,7 @@ from states import (
     add_necessary_follows,
     delete_necessary_follows,
     AddPost,
-    Settings
+    Settings,
 )
 import os
 
@@ -67,6 +67,7 @@ firebase_credentials = {
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = os.getenv("TOKEN")
 cred = credentials.Certificate(firebase_credentials)
+# cred = credentials.Certificate("serviceAccount.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 ADMIN_ID = os.getenv("ADMIN_ID")
@@ -77,10 +78,15 @@ users = {}
 
 # WEB HOOK CODES
 WEBHOOK_HOST = "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
+# WEBHOOK_HOST = (
+#     "https://ecb9-188-113-221-223.ngrok-free.app"  # ngrok’dan keyin yangilanadi
+# )
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"  # Lokal server uchun
-WEBAPP_PORT = 8000       # Siz tanlagan port
+WEBAPP_PORT = 8000  # Siz tanlagan port
+
+POSTS_PER_PAGE = 10
 
 
 def get_admins():
@@ -170,7 +176,9 @@ async def start_fun(message: Message):
     channels = get_channels_list()
     user_name = message.from_user.full_name
 
-    text, keyboard, subscribed = await send_subscription_message(user_id, channels, user_name)
+    text, keyboard, subscribed = await send_subscription_message(
+        user_id, channels, user_name
+    )
     if not await is_private_chat(message):
         return
     await message.answer(f"{text}", reply_markup=keyboard, parse_mode="html")
@@ -178,7 +186,7 @@ async def start_fun(message: Message):
     # Foydalanuvchi ma'lumotlarini saqlash yoki yangilash
     user_ref = db.collection("Users").document(str(user_id))
     user_data = user_ref.get().to_dict() or {}
-    
+
     # Agar user yangi bo'lsa, standart sozlamalar qo'shiladi
     if not user_data:
         user_data = {
@@ -186,29 +194,163 @@ async def start_fun(message: Message):
             "name": user_name,
             "username": message.from_user.username or "Noma'lum",
             "notification_frequency": "daily",  # Standart qiymat
-            "last_sent_date": None
+            "last_sent_date": None,
         }
     else:
         # Eski foydalanuvchi bo'lsa, faqat asosiy ma'lumotlarni yangilaymiz
-        user_data.update({
-            "id": user_id,
-            "name": user_name,
-            "username": message.from_user.username or "Noma'lum"
-        })
-    
+        user_data.update(
+            {
+                "id": user_id,
+                "name": user_name,
+                "username": message.from_user.username or "Noma'lum",
+            }
+        )
+
     user_ref.set(user_data)
+
+
+@dp.message(F.text == "📖 Yuborilgan postlar")
+async def show_sent_posts(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_ref = db.collection("Users").document(str(user_id))
+    user_data = user_ref.get().to_dict()
+    if not user_data:
+        await message.answer("Sizga hali postlar yuborilmagan :(")
+        return
+
+    if "sent_posts" not in user_data:
+        await message.answer("Sizga hali postlar yuborilmagan ☹")
+        return
+    sent_posts = user_data["sent_posts"]
+
+    if not sent_posts:
+        await message.answer("Yuborilgan postlar topilmadi 🙄")
+        return
+    await state.update_data(sent_posts=sent_posts, current_page=0)
+    await display_page(message, sent_posts, 0)
+
+
+async def display_page(message: Message, sent_posts: list, page: int):
+    start_idx = page * POSTS_PER_PAGE
+    end_idx = start_idx + POSTS_PER_PAGE
+    page_posts = sent_posts[start_idx:end_idx]
+    
+    if not page_posts:
+        await message.answer("Postlar topilmadi 😫")
+        return
+
+    # Ro‘yxat matnini shakllantirish
+    response = "\n".join(
+        [f"🎐{i+1+start_idx}) {post['title']}" for i, post in enumerate(page_posts)]
+    )
+
+    # Tugmalar
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+    
+    # Tugmalarni 5 tadan ikki qator qilib joylashtirish
+    buttons_rows = []
+    current_row = []
+    for i, post in enumerate(page_posts):
+        current_row.append(
+            InlineKeyboardButton(
+                text=str(i + 1 + start_idx), callback_data=f"post_{post['id']}"
+            )
+        )
+        if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+            buttons_rows.append(current_row)
+            current_row = []
+    if current_row:  # Qolgan tugmalarni qatorga qo‘shish
+        buttons_rows.append(current_row)
+    
+    # Tugma qatorlarini keyboard’ga qo‘shish
+    keyboard.inline_keyboard.extend(buttons_rows)
+
+    # Oldingi/Keyingi tugmalari
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(
+            InlineKeyboardButton(text="⬅ Oldingi", callback_data=f"prev_{page}")
+        )
+    if end_idx < len(sent_posts):
+        nav_buttons.append(
+            InlineKeyboardButton(text="Keyingi ➡", callback_data=f"next_{page}")
+        )
+    if nav_buttons:
+        keyboard.inline_keyboard.append(nav_buttons)
+
+    # Xabarni yangilash yoki yuborish
+    if message.text.startswith("📑 Yuborilgan postlar"):
+        await message.edit_text(f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard)
+    else:
+        await message.answer(f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard)
+
+@dp.callback_query(F.data.startswith(("post_", "prev_", "next_")))
+async def handle_callbacks(callback: CallbackQuery, state: FSMContext):
+    data = callback.data
+    user_data = await state.get_data()
+    sent_posts = user_data.get("sent_posts", [])
+
+    if data.startswith("post_"):
+        post_id = data.split("_")[1]
+        post_ref = db.collection("posts").document(post_id)
+        post_data = post_ref.get().to_dict()
+
+        if not post_data:
+            await callback.message.answer("Bu post topilmadi")
+            print(post_data)
+            return
+
+        if post_data["type"] == "text":
+            await callback.message.answer(
+                post_data["content"], parse_mode="html", disable_web_page_preview=True
+            )
+        elif post_data["type"] == "photo":
+            await callback.message.answer_photo(
+                post_data["content"],
+                caption=post_data.get("caption", ""),
+                parse_mode="html",
+            )
+        elif post_data["type"] == "video":
+            await callback.message.answer_video(
+                post_data["content"],
+                caption=post_data.get("caption", ""),
+                parse_mode="html",
+            )
+
+    elif data.startswith("prev_") or data.startswith("next_"):
+        current_page = int(data.split("_")[1])
+        new_page = current_page - 1 if data.startswith("prev_") else current_page + 1
+        await state.update_data(current_page=new_page)
+        await display_page(callback.message, sent_posts, new_page)
+
+    await callback.answer()
+
 
 @dp.message(F.text == "🛠 Sozlamalar")
 async def settings_menu(message: Message, state: FSMContext):
     await message.answer(
-        "Post qabul qilish chastotasini tanlang:\n1. Har kuni\n2. Har ikki kunda\n3. Muayyan kunlarda",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Har kuni", callback_data="daily")],
-            [InlineKeyboardButton(text="Har ikki kunda", callback_data="every_two_days")],
-            [InlineKeyboardButton(text="Muayyan kunlar", callback_data="specific_days")]
-        ])
+        "Postlarni qachon olishni hohlaysiz❓\nBulardan birini tanlashingiz mumkin 👇",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Har kuni", callback_data="daily")],
+                [
+                    InlineKeyboardButton(
+                        text="Har ikki kunda", callback_data="every_two_days"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="Muayyan kunlar", callback_data="specific_days"
+                    )
+                ],
+            ]
+        ),
+    )
+    await message.answer(
+        "🔙 Orqaga qaytish uchun ⬅️ Ortga tugmasini bosing!", reply_markup=user_back
     )
     await state.set_state(Settings.frequency)
+
 
 @dp.callback_query(F.data.in_(["daily", "every_two_days", "specific_days"]))
 async def set_frequency(callback: CallbackQuery, state: FSMContext):
@@ -217,21 +359,20 @@ async def set_frequency(callback: CallbackQuery, state: FSMContext):
     if callback.data == "every_two_days":
         text = "Sizga postlar endi har ikki kunda bittadan yuboriladi ✅"
     elif callback.data == "daily":
-        text = "Sizga endi postlar har kuni bittadan yuboriladi 🌟"    
+        text = "Sizga endi postlar har kuni bittadan yuboriladi 🌟"
     if frequency == "specific_days":
         await callback.message.answer(
             "Qaysi kunlarda post olishni xohlaysiz? Kunlarni vergul bilan ajrating❗ (masalan: Dushanba, Chorshanba, Juma)",
-            reply_markup=user_back
+            reply_markup=user_back,
         )
         await state.set_state(Settings.frequency)
     else:
         user_ref = db.collection("Users").document(str(user_id))
         user_ref.update({"notification_frequency": frequency})
-        await callback.message.answer(
-            f"{text}",
-            reply_markup=user_menu_button
-        )
+        await callback.message.answer(f"{text}", reply_markup=user_menu_button)
         await state.clear()
+    await callback.answer()
+
 
 @dp.message(Settings.frequency)
 async def set_specific_days(message: Message, state: FSMContext):
@@ -239,19 +380,30 @@ async def set_specific_days(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Sozlamalar bekor qilindi!", reply_markup=user_menu_button)
         return
-    
+
     days = [day.strip() for day in message.text.split(",")]
-    valid_days = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"]
+    valid_days = [
+        "Dushanba",
+        "Seshanba",
+        "Chorshanba",
+        "Payshanba",
+        "Juma",
+        "Shanba",
+        "Yakshanba",
+    ]
     if all(day in valid_days for day in days):
         user_ref = db.collection("Users").document(str(message.from_user.id))
         user_ref.update({"notification_frequency": {"specific_days": days}})
         await message.answer(
             f"Postlar {', '.join(days)} kunlari yuboriladi!",
-            reply_markup=user_menu_button
+            reply_markup=user_menu_button,
         )
     else:
-        await message.answer("Noto‘g‘ri kunlar kiritildi! Iltimos, o'zbekcha kun nomlarini vergul bilan kiriting va hammasini imloviy xatolarsiz yozganingizni tekshiring!")
+        await message.answer(
+            "Noto‘g‘ri kunlar kiritildi! Iltimos, o'zbekcha kun nomlarini vergul bilan kiriting va hammasini imloviy xatolarsiz yozganingizni tekshiring!"
+        )
     await state.clear()
+
 
 @dp.message(F.text == "🆕 Yangi postlar qo'shish 🆕")
 async def add_post_start(message: Message, state: FSMContext):
@@ -261,9 +413,10 @@ async def add_post_start(message: Message, state: FSMContext):
         return
     await message.answer(
         "Yangi post uchun matn, rasm yoki video yuboring!\nOrqaga qaytish uchun ⬅️ Ortga tugmasini bosing.",
-        reply_markup=user_back
+        reply_markup=user_back,
     )
     await state.set_state(AddPost.content)
+
 
 @dp.message(AddPost.content)
 async def save_post(message: Message, state: FSMContext):
@@ -271,12 +424,12 @@ async def save_post(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Post qo‘shish bekor qilindi!", reply_markup=admin_panel)
         return
-    
+
     post_data = {
         "created_at": datetime.now().isoformat(),
         "admin_id": message.from_user.id,
     }
-    
+
     if message.html_text:
         post_data["type"] = "text"
         post_data["content"] = message.html_text
@@ -291,17 +444,123 @@ async def save_post(message: Message, state: FSMContext):
     else:
         await message.answer("Faqat matn, rasm yoki video yuborishingiz mumkin!")
         return
-    
+
     # Firestore'ga saqlash
+    await state.update_data(post_data=post_data)
+    await state.set_state(AddPost.title)
+    await message.answer("Post uchun sarlavha kiriting!\n<blockquote>Bu sarlavha ro'yxatda ko'rinish uchun kerak</blockquote>")
+
+@dp.message(AddPost.title)
+async def save_post_title(message: Message, state: FSMContext):
+    if message.text == "⬅️ Ortga":
+        await state.clear()
+        await message.answer("Post qo‘shish bekor qilindi!", reply_markup=admin_panel)
+        return
+
+    # Avval saqlangan post ma'lumotlarini olish
+    data = await state.get_data()
+    post_data = data.get("post_data", {})
+
+    # Title’ni qo‘shish
+    post_data["title"] = message.text
+
+    # Firestore’ga saqlash
     post_ref = db.collection("posts").document()
     post_data["id"] = post_ref.id
     post_ref.set(post_data)
-    
+
     await message.answer(
-        f"Post (ID: {post_ref.id}) muvaffaqiyatli saqlandi!",
-        reply_markup=admin_panel
+        f"Post (ID: {post_ref.id}) muvaffaqiyatli saqlandi!", reply_markup=admin_panel
     )
     await state.clear()
+
+
+@dp.message(F.text =="🗂 Barcha Postlar 🗂")
+async def show_all_posts(message: Message, state: FSMContext):
+    all_posts = [(post.id, post.to_dict()) for post in db.collection("posts").stream()]
+    all_posts = sorted(all_posts, key=lambda x: x[1]["created_at"])  # Vaqt bo‘yicha tartiblash
+
+    if not all_posts:
+        await message.answer("Postlar topilmadi!")
+        return
+
+    await state.update_data(all_posts=all_posts, current_page=0)
+    await display_all_posts_page(message, all_posts, 0)
+
+async def display_all_posts_page(message: Message, all_posts: list, page: int):
+    start_idx = page * POSTS_PER_PAGE
+    end_idx = start_idx + POSTS_PER_PAGE
+    page_posts = all_posts[start_idx:end_idx]
+
+    if not page_posts:
+        await message.edit_text("Postlar topilmadi!")
+        return
+
+    # Ro‘yxat matnini shakllantirish
+    response = "\n".join([f"✏{i+1+start_idx}. {post[1]['title']}" for i, post in enumerate(page_posts)])
+
+    # Tugmalar
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+    
+    # Tugmalarni 5 tadan ikki qator qilib joylashtirish
+    buttons_rows = []
+    current_row = []
+    for i, (post_id, _) in enumerate(page_posts):
+        current_row.append(InlineKeyboardButton(text=str(i + 1 + start_idx), callback_data=f"allpost_{post_id}"))
+        if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
+            buttons_rows.append(current_row)
+            current_row = []
+    if current_row:  # Qolgan tugmalarni qatorga qo‘shish
+        buttons_rows.append(current_row)
+    
+    # Tugma qatorlarini keyboard’ga qo‘shish
+    keyboard.inline_keyboard.extend(buttons_rows)
+
+    # Oldingi/Keyingi tugmalari
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton(text="⬅ Oldingi", callback_data=f"allprev_{page}"))
+    if end_idx < len(all_posts):
+        nav_buttons.append(InlineKeyboardButton(text="Keyingi ➡", callback_data=f"allnext_{page}"))
+    if nav_buttons:
+        keyboard.inline_keyboard.append(nav_buttons)
+
+    # Xabarni yangilash yoki yuborish
+    if message.text.startswith("✏"):
+        await message.edit_text(response, reply_markup=keyboard)
+    else:
+        await message.answer(response, reply_markup=keyboard)
+
+@dp.callback_query(lambda c: c.data.startswith(("allpost_", "allprev_", "allnext_")))
+async def handle_all_posts_callbacks(callback: CallbackQuery, state: FSMContext):
+    data = callback.data
+    user_data = await state.get_data()
+    all_posts = user_data.get("all_posts", [])
+
+    if data.startswith("allpost_"):
+        post_id = data.split("_")[1]
+        post_ref = db.collection("posts").document(post_id)
+        post_data = post_ref.get().to_dict()
+
+        if not post_data:
+            await callback.message.answer("Post topilmadi!")
+            return
+
+        if post_data["type"] == "text":
+            await callback.message.answer(post_data["content"], parse_mode="html", disable_web_page_preview=True)
+        elif post_data["type"] == "photo":
+            await callback.message.answer_photo(post_data["content"], caption=post_data.get("caption", ""), parse_mode="html")
+        elif post_data["type"] == "video":
+            await callback.message.answer_video(post_data["content"], caption=post_data.get("caption", ""), parse_mode="html")
+
+    elif data.startswith("allprev_") or data.startswith("allnext_"):
+        current_page = int(data.split("_")[1])
+        new_page = current_page - 1 if data.startswith("allprev_") else current_page + 1
+        await state.update_data(current_page=new_page)
+        await display_all_posts_page(callback.message, all_posts, new_page)
+
+    await callback.answer()
+
 
 @dp.message(Command("admin"))
 async def admin_panel_fun(message: Message):
@@ -805,38 +1064,41 @@ DAY_MAPPING = {
     "Payshanba": "Thursday",
     "Juma": "Friday",
     "Shanba": "Saturday",
-    "Yakshanba": "Sunday"
+    "Yakshanba": "Sunday",
 }
+
 
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=7, minute=33, second=00, microsecond=0)
-        
+        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=59, microsecond=0)
+
         if now_uz > today_8_11_uz:
             next_run = today_8_11_uz + timedelta(days=1)
         else:
             next_run = today_8_11_uz
-        
+
         seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
-        print(f"Joriy vaqt: {now_uz}, Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}")
-        
+        print(
+            f"Joriy vaqt: {now_uz}, Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
+        )
+
         await asyncio.sleep(seconds_until_next_run)
-        
+
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
         users_ref = db.collection("Users").stream()
-        
+
         # Barcha postlarni yaratilish vaqti bo‘yicha tartib bilan olish
         all_posts = sorted(
             [post.to_dict() for post in db.collection("posts").stream()],
-            key=lambda x: x["created_at"]
+            key=lambda x: x["created_at"],
         )
-        
+
         if not all_posts:
             print("Post topilmadi!")
             await asyncio.sleep(3600)
             continue
-        
+
         batch_size = 100
         users_to_send = {}
 
@@ -846,7 +1108,7 @@ async def send_scheduled_posts():
             frequency = user_data.get("notification_frequency", "daily")
             last_sent = user_data.get("last_sent_date")
             last_post_id = user_data.get("last_post_id", None)
-            
+
             should_send = False
             if frequency == "daily":
                 should_send = True  # Har kuni yuboriladi, lekin keyingi post olinadi
@@ -858,10 +1120,12 @@ async def send_scheduled_posts():
                     if (datetime.now(UZ_TIMEZONE) - last_sent_date).days >= 2:
                         should_send = True
             elif isinstance(frequency, dict) and "specific_days" in frequency:
-                specific_days_en = [DAY_MAPPING[day] for day in frequency["specific_days"]]
+                specific_days_en = [
+                    DAY_MAPPING[day] for day in frequency["specific_days"]
+                ]
                 if current_day_en in specific_days_en:
                     should_send = True
-            
+
             if should_send:
                 # Oxirgi postdan keyingi postni topamiz
                 if last_post_id is None:
@@ -869,7 +1133,10 @@ async def send_scheduled_posts():
                     post_to_send = all_posts[0]
                 else:
                     # Oxirgi postdan keyingi postni topamiz
-                    last_post_index = next((i for i, p in enumerate(all_posts) if p["id"] == last_post_id), -1)
+                    last_post_index = next(
+                        (i for i, p in enumerate(all_posts) if p["id"] == last_post_id),
+                        -1,
+                    )
                     next_post_index = last_post_index + 1
                     if next_post_index < len(all_posts):
                         post_to_send = all_posts[next_post_index]
@@ -877,63 +1144,97 @@ async def send_scheduled_posts():
                         # Agar keyingi post bo‘lmasa, o‘tkazib yuboramiz
                         continue
                 users_to_send[user_id] = {"data": user_data, "post": post_to_send}
-        
+
         print(f"Yuboriladigan foydalanuvchilar soni: {len(users_to_send)}")
         if not users_to_send:
             print("Yuborish uchun foydalanuvchi yoki yangi post topilmadi!")
-            await asyncio.sleep(86400) #86400
+            await asyncio.sleep(86400)  # 86400
             continue
-        
+
         # Batch qilib yuborish
         user_ids = list(users_to_send.keys())
         for i in range(0, len(user_ids), batch_size):
-            batch_users = user_ids[i:i + batch_size]
+            batch_users = user_ids[i : i + batch_size]
             tasks = []
-            
+
             for user_id in batch_users:
                 user_info = users_to_send[user_id]
                 post_data = user_info["post"]
                 if post_data["type"] == "text":
-                    task = bot.send_message(user_id, post_data["content"], parse_mode="html", disable_web_page_preview=True)
+                    task = bot.send_message(
+                        user_id,
+                        post_data["content"],
+                        parse_mode="html",
+                        disable_web_page_preview=True,
+                    )
                 elif post_data["type"] == "photo":
-                    task = bot.send_photo(user_id, post_data["content"], caption=post_data.get("caption", ""), parse_mode="html", disable_web_page_preview=True)
+                    task = bot.send_photo(
+                        user_id,
+                        post_data["content"],
+                        caption=post_data.get("caption", ""),
+                        parse_mode="html",
+                        disable_web_page_preview=True,
+                    )
                 elif post_data["type"] == "video":
-                    task = bot.send_video(user_id, post_data["content"], caption=post_data.get("caption", ""), parse_mode="html", disable_web_page_preview=True)
+                    task = bot.send_video(
+                        user_id,
+                        post_data["content"],
+                        caption=post_data.get("caption", ""),
+                        parse_mode="html",
+                        disable_web_page_preview=True,
+                    )
                 tasks.append(task)
-            
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
                     print(f"Xato yuz berdi: {result}")
-            
+
             # Firestore’ni yangilash
             batch = db.batch()
             for user_id in batch_users:
                 user_info = users_to_send[user_id]
                 doc_ref = db.collection("Users").document(str(user_id))
-                batch.update(doc_ref, {
-                    "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
-                    "last_post_id": user_info["post"]["id"]
-                })
+                batch.update(
+                    doc_ref,
+                    {
+                        "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
+                        "last_post_id": user_info["post"]["id"],
+                        "sent_posts": firestore.ArrayUnion(
+                            [
+                                {
+                                    "id": user_info["post"]["id"],
+                                    "title": user_info["post"]["title"],
+                                }
+                            ]
+                        ),
+                    },
+                )
             batch.commit()
-            
+
             await asyncio.sleep(1.5)
-        
-        await asyncio.sleep(86400) #86400
+
+        await asyncio.sleep(86400)  # 86400
+
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
-        
+
 # Webhook sozlash uchun startup va shutdown (YANGI)
 app = web.Application()
 webhook_requests_handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
 webhook_requests_handler.register(app, path=WEBHOOK_PATH)
 setup_application(app, dp, bot=bot)
 
+
 async def handle(request):
     return await webhook_requests_handler.handle(request)
 
+
 app.router.add_post("/api/webhook", handle)
-app.router.add_get("/api/webhook", handle)  # Vercel uchun GET so‘rovlarini qo‘llab-quvvatlash
+app.router.add_get(
+    "/api/webhook", handle
+)  # Vercel uchun GET so‘rovlarini qo‘llab-quvvatlash
+
 
 # Webhook’ni sozlash
 async def on_startup():
@@ -941,9 +1242,11 @@ async def on_startup():
     print(f"Webhook sozlandi: {WEBHOOK_URL}")
     asyncio.create_task(send_scheduled_posts())
 
+
 async def on_shutdown():
     await bot.delete_webhook()
     print("Webhook o‘chirildi")
+
 
 dp.startup.register(on_startup)
 dp.shutdown.register(on_shutdown)

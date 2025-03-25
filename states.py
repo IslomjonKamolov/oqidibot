@@ -28,6 +28,7 @@ class delete_necessary_follows(StatesGroup):
 
 class AddPost(StatesGroup):
     content = State()
+    title = State()
 
 class Settings(StatesGroup):
     frequency = State()
