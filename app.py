@@ -79,7 +79,7 @@ users = {}
 # WEB HOOK CODES
 WEBHOOK_HOST = "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
 # WEBHOOK_HOST = (
-#     "https://ecb9-188-113-221-223.ngrok-free.app"  # ngrok’dan keyin yangilanadi
+#     "https://3e0a-188-113-198-250.ngrok-free.app"  # ngrok’dan keyin yangilanadi
 # )
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -701,7 +701,6 @@ async def message_to_admin(message: Message, state: FSMContext):
     user_name = message.from_user.full_name
 
     text, keyboard, bool = await send_subscription_message(user_id, channels, user_name)
-    print(bool)
     if bool:
         keyboard = user_back
         text = "Murojatingizni yuboring!\n\nFaqat matn yozing aks holda xabaringiz adminga yuborilmaydi❗❗❗\n\nOrqaga qaytish uchun ⬅️ Ortga tugmasini bosing!"
@@ -1068,11 +1067,162 @@ DAY_MAPPING = {
 }
 
 
+# async def send_scheduled_posts():
+#     while True:
+#         now_uz = datetime.now(UZ_TIMEZONE)
+#         today_8_11_uz = now_uz.replace(hour=6, minute=00, second=59, microsecond=0)
+
+#         if now_uz > today_8_11_uz:
+#             next_run = today_8_11_uz + timedelta(days=1)
+#         else:
+#             next_run = today_8_11_uz
+
+#         seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
+#         print(
+#             f"Joriy vaqt: {now_uz}, Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
+#         )
+
+#         await asyncio.sleep(seconds_until_next_run)
+
+#         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
+#         users_ref = db.collection("Users").stream()
+
+#         # Barcha postlarni yaratilish vaqti bo‘yicha tartib bilan olish
+#         all_posts = sorted(
+#             [post.to_dict() for post in db.collection("posts").stream()],
+#             key=lambda x: x["created_at"],
+#         )
+
+#         if not all_posts:
+#             print("Post topilmadi!")
+#             await asyncio.sleep(3600)
+#             continue
+
+#         batch_size = 100
+#         users_to_send = {}
+
+#         for user in users_ref:
+#             user_data = user.to_dict()
+#             user_id = user_data["id"]
+#             frequency = user_data.get("notification_frequency", "daily")
+#             last_sent = user_data.get("last_sent_date")
+#             last_post_id = user_data.get("last_post_id", None)
+
+#             should_send = False
+#             if frequency == "daily":
+#                 should_send = True  # Har kuni yuboriladi, lekin keyingi post olinadi
+#             elif frequency == "every_two_days":
+#                 if last_sent is None:
+#                     should_send = True
+#                 else:
+#                     last_sent_date = datetime.fromisoformat(last_sent)
+#                     if (datetime.now(UZ_TIMEZONE) - last_sent_date).days >= 2:
+#                         should_send = True
+#             elif isinstance(frequency, dict) and "specific_days" in frequency:
+#                 specific_days_en = [
+#                     DAY_MAPPING[day] for day in frequency["specific_days"]
+#                 ]
+#                 if current_day_en in specific_days_en:
+#                     should_send = True
+
+#             if should_send:
+#                 # Oxirgi postdan keyingi postni topamiz
+#                 if last_post_id is None:
+#                     # Birinchi postni yuboramiz
+#                     post_to_send = all_posts[0]
+#                 else:
+#                     # Oxirgi postdan keyingi postni topamiz
+#                     last_post_index = next(
+#                         (i for i, p in enumerate(all_posts) if p["id"] == last_post_id),
+#                         -1,
+#                     )
+#                     next_post_index = last_post_index + 1
+#                     if next_post_index < len(all_posts):
+#                         post_to_send = all_posts[next_post_index]
+#                     else:
+#                         # Agar keyingi post bo‘lmasa, o‘tkazib yuboramiz
+#                         continue
+#                 users_to_send[user_id] = {"data": user_data, "post": post_to_send}
+
+#         print(f"Yuboriladigan foydalanuvchilar soni: {len(users_to_send)}")
+#         if not users_to_send:
+#             print("Yuborish uchun foydalanuvchi yoki yangi post topilmadi!")
+#             await asyncio.sleep(86400)  # 86400
+#             continue
+
+#         # Batch qilib yuborish
+#         user_ids = list(users_to_send.keys())
+#         for i in range(0, len(user_ids), batch_size):
+#             batch_users = user_ids[i : i + batch_size]
+#             tasks = []
+
+#             for user_id in batch_users:
+#                 user_info = users_to_send[user_id]
+#                 post_data = user_info["post"]
+#                 if post_data["type"] == "text":
+#                     task = bot.send_message(
+#                         user_id,
+#                         post_data["content"],
+#                         parse_mode="html",
+#                         disable_web_page_preview=True,
+#                     )
+#                 elif post_data["type"] == "photo":
+#                     task = bot.send_photo(
+#                         user_id,
+#                         post_data["content"],
+#                         caption=post_data.get("caption", ""),
+#                         parse_mode="html",
+#                         disable_web_page_preview=True,
+#                     )
+#                 elif post_data["type"] == "video":
+#                     task = bot.send_video(
+#                         user_id,
+#                         post_data["content"],
+#                         caption=post_data.get("caption", ""),
+#                         parse_mode="html",
+#                         disable_web_page_preview=True,
+#                     )
+#                 tasks.append(task)
+
+#             results = await asyncio.gather(*tasks, return_exceptions=True)
+#             for result in results:
+#                 if isinstance(result, Exception):
+#                     print(f"Xato yuz berdi: {result}")
+
+#             # Firestore’ni yangilash
+#             batch = db.batch()
+#             for user_id in batch_users:
+#                 user_info = users_to_send[user_id]
+#                 doc_ref = db.collection("Users").document(str(user_id))
+#                 batch.update(
+#                     doc_ref,
+#                     {
+#                         "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
+#                         "last_post_id": user_info["post"]["id"],
+#                         "sent_posts": firestore.ArrayUnion(
+#                             [
+#                                 {
+#                                     "id": user_info["post"]["id"],
+#                                     "title": user_info["post"]["title"],
+#                                 }
+#                             ]
+#                         ),
+#                     },
+#                 )
+#             batch.commit()
+
+#             await asyncio.sleep(1.5)
+
+#         await asyncio.sleep(86400)  # 86400
+
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=59, microsecond=0)
+        today_8_11_uz = now_uz.replace(hour=8, minute=33, second=00, microsecond=0)
 
+        # Joriy vaqt va keyingi ishga tushish vaqtini tekshirish
+        print(f"Joriy vaqt: {now_uz}, 06:00:59 vaqti: {today_8_11_uz}")
+        
         if now_uz > today_8_11_uz:
             next_run = today_8_11_uz + timedelta(days=1)
         else:
@@ -1080,12 +1230,14 @@ async def send_scheduled_posts():
 
         seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
         print(
-            f"Joriy vaqt: {now_uz}, Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
+            f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
         )
 
         await asyncio.sleep(seconds_until_next_run)
 
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
+        print(f"Bugungi kun (EN): {current_day_en}")  # Bugungi kunni tekshirish
+        
         users_ref = db.collection("Users").stream()
 
         # Barcha postlarni yaratilish vaqti bo‘yicha tartib bilan olish
@@ -1093,6 +1245,9 @@ async def send_scheduled_posts():
             [post.to_dict() for post in db.collection("posts").stream()],
             key=lambda x: x["created_at"],
         )
+        print(f"Postlar soni: {len(all_posts)}")  # Postlar sonini tekshirish
+        if all_posts:
+            print(f"Birinchi post ID: {all_posts[0]['id']}, Oxirgi post ID: {all_posts[-1]['id']}")  # Postlar diapazonini ko‘rish
 
         if not all_posts:
             print("Post topilmadi!")
@@ -1109,46 +1264,59 @@ async def send_scheduled_posts():
             last_sent = user_data.get("last_sent_date")
             last_post_id = user_data.get("last_post_id", None)
 
+            # Foydalanuvchi ma’lumotlarini tekshirish
+            print(f"Foydalanuvchi {user_id}: frequency={frequency}, last_sent={last_sent}, last_post_id={last_post_id}")
+
             should_send = False
             if frequency == "daily":
-                should_send = True  # Har kuni yuboriladi, lekin keyingi post olinadi
+                should_send = True
+                print(f"Foydalanuvchi {user_id}: Har kuni yuborish tanlandi")
             elif frequency == "every_two_days":
                 if last_sent is None:
                     should_send = True
+                    print(f"Foydalanuvchi {user_id}: Hali xabar yuborilmagan, yuboriladi")
                 else:
-                    last_sent_date = datetime.fromisoformat(last_sent)
-                    if (datetime.now(UZ_TIMEZONE) - last_sent_date).days >= 2:
-                        should_send = True
+                    try:
+                        last_sent_date = datetime.fromisoformat(last_sent)
+                        days_diff = (datetime.now(UZ_TIMEZONE) - last_sent_date).days
+                        print(f"Foydalanuvchi {user_id}: Oxirgi yuborishdan {days_diff} kun o‘tgan")
+                        if days_diff >= 2:
+                            should_send = True
+                            print(f"Foydalanuvchi {user_id}: 2+ kun o‘tgan, yuboriladi")
+                    except (ValueError, TypeError) as e:
+                        print(f"Foydalanuvchi {user_id}: last_sent format xatosi: {e}")
             elif isinstance(frequency, dict) and "specific_days" in frequency:
                 specific_days_en = [
                     DAY_MAPPING[day] for day in frequency["specific_days"]
                 ]
+                print(f"Foydalanuvchi {user_id}: Maxsus kunlar: {specific_days_en}")
                 if current_day_en in specific_days_en:
                     should_send = True
+                    print(f"Foydalanuvchi {user_id}: Bugun maxsus kun, yuboriladi")
 
             if should_send:
-                # Oxirgi postdan keyingi postni topamiz
                 if last_post_id is None:
-                    # Birinchi postni yuboramiz
                     post_to_send = all_posts[0]
+                    print(f"Foydalanuvchi {user_id}: Birinchi post yuboriladi: {post_to_send['id']}")
                 else:
-                    # Oxirgi postdan keyingi postni topamiz
                     last_post_index = next(
                         (i for i, p in enumerate(all_posts) if p["id"] == last_post_id),
                         -1,
                     )
+                    print(f"Foydalanuvchi {user_id}: Oxirgi post indeksi: {last_post_index}")
                     next_post_index = last_post_index + 1
                     if next_post_index < len(all_posts):
                         post_to_send = all_posts[next_post_index]
+                        print(f"Foydalanuvchi {user_id}: Keyingi post yuboriladi: {post_to_send['id']}")
                     else:
-                        # Agar keyingi post bo‘lmasa, o‘tkazib yuboramiz
+                        print(f"Foydalanuvchi {user_id}: Yangi post yo‘q, o‘tkazib yuboriladi")
                         continue
                 users_to_send[user_id] = {"data": user_data, "post": post_to_send}
 
         print(f"Yuboriladigan foydalanuvchilar soni: {len(users_to_send)}")
         if not users_to_send:
             print("Yuborish uchun foydalanuvchi yoki yangi post topilmadi!")
-            await asyncio.sleep(86400)  # 86400
+            await asyncio.sleep(86400)
             continue
 
         # Batch qilib yuborish
@@ -1160,6 +1328,7 @@ async def send_scheduled_posts():
             for user_id in batch_users:
                 user_info = users_to_send[user_id]
                 post_data = user_info["post"]
+                print(f"Foydalanuvchi {user_id}: Post turi: {post_data['type']}, ID: {post_data['id']}")
                 if post_data["type"] == "text":
                     task = bot.send_message(
                         user_id,
@@ -1186,9 +1355,11 @@ async def send_scheduled_posts():
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in results:
+            for j, result in enumerate(results):
                 if isinstance(result, Exception):
-                    print(f"Xato yuz berdi: {result}")
+                    print(f"Foydalanuvchi {batch_users[j]} uchun xato: {result}")
+                else:
+                    print(f"Foydalanuvchi {batch_users[j]} ga xabar muvaffaqiyatli yuborildi")
 
             # Firestore’ni yangilash
             batch = db.batch()
@@ -1211,10 +1382,11 @@ async def send_scheduled_posts():
                     },
                 )
             batch.commit()
+            print(f"Batch {i // batch_size + 1}: Firestore yangilandi")
 
             await asyncio.sleep(1.5)
 
-        await asyncio.sleep(86400)  # 86400
+        await asyncio.sleep(86400)  # 24 soat kutish
 
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
