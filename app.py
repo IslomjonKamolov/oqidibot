@@ -1253,7 +1253,7 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_scheduled_time = now_uz.replace(hour=4, minute=0, second=0, microsecond=0)
+        today_scheduled_time = now_uz.replace(hour=16, minute=0, second=0, microsecond=0)
 
         time_diff = (now_uz - today_scheduled_time).total_seconds()
 
