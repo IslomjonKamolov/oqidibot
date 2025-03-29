@@ -61,7 +61,7 @@ firebase_credentials = {
     "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
     "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_X509_CERT_URL"),
     "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL"),
-    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
+    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN"),
 }
 
 # Bot token can be obtained via https://t.me/BotFather
@@ -77,7 +77,9 @@ dp = Dispatcher()
 users = {}
 
 # WEB HOOK CODES
-WEBHOOK_HOST = "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
+WEBHOOK_HOST = (
+    "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
+)
 # WEBHOOK_HOST = (
 #     "https://3e0a-188-113-198-250.ngrok-free.app"  # ngrok’dan keyin yangilanadi
 # )
@@ -234,7 +236,7 @@ async def display_page(message: Message, sent_posts: list, page: int):
     start_idx = page * POSTS_PER_PAGE
     end_idx = start_idx + POSTS_PER_PAGE
     page_posts = sent_posts[start_idx:end_idx]
-    
+
     if not page_posts:
         await message.answer("Postlar topilmadi 😫")
         return
@@ -246,7 +248,7 @@ async def display_page(message: Message, sent_posts: list, page: int):
 
     # Tugmalar
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-    
+
     # Tugmalarni 5 tadan ikki qator qilib joylashtirish
     buttons_rows = []
     current_row = []
@@ -261,7 +263,7 @@ async def display_page(message: Message, sent_posts: list, page: int):
             current_row = []
     if current_row:  # Qolgan tugmalarni qatorga qo‘shish
         buttons_rows.append(current_row)
-    
+
     # Tugma qatorlarini keyboard’ga qo‘shish
     keyboard.inline_keyboard.extend(buttons_rows)
 
@@ -280,9 +282,14 @@ async def display_page(message: Message, sent_posts: list, page: int):
 
     # Xabarni yangilash yoki yuborish
     if message.text.startswith("📑 Yuborilgan postlar"):
-        await message.edit_text(f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard)
+        await message.edit_text(
+            f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard
+        )
     else:
-        await message.answer(f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard)
+        await message.answer(
+            f"📑 Yuborilgan postlar ro'yxati:\n\n{response}", reply_markup=keyboard
+        )
+
 
 @dp.callback_query(F.data.startswith(("post_", "prev_", "next_")))
 async def handle_callbacks(callback: CallbackQuery, state: FSMContext):
@@ -448,7 +455,10 @@ async def save_post(message: Message, state: FSMContext):
     # Firestore'ga saqlash
     await state.update_data(post_data=post_data)
     await state.set_state(AddPost.title)
-    await message.answer("Post uchun sarlavha kiriting!\n<blockquote>Bu sarlavha ro'yxatda ko'rinish uchun kerak</blockquote>")
+    await message.answer(
+        "Post uchun sarlavha kiriting!\n<blockquote>Bu sarlavha ro'yxatda ko'rinish uchun kerak</blockquote>"
+    )
+
 
 @dp.message(AddPost.title)
 async def save_post_title(message: Message, state: FSMContext):
@@ -475,10 +485,12 @@ async def save_post_title(message: Message, state: FSMContext):
     await state.clear()
 
 
-@dp.message(F.text =="🗂 Barcha Postlar 🗂")
+@dp.message(F.text == "🗂 Barcha Postlar 🗂")
 async def show_all_posts(message: Message, state: FSMContext):
     all_posts = [(post.id, post.to_dict()) for post in db.collection("posts").stream()]
-    all_posts = sorted(all_posts, key=lambda x: x[1]["created_at"])  # Vaqt bo‘yicha tartiblash
+    all_posts = sorted(
+        all_posts, key=lambda x: x[1]["created_at"]
+    )  # Vaqt bo‘yicha tartiblash
 
     if not all_posts:
         await message.answer("Postlar topilmadi!")
@@ -486,6 +498,7 @@ async def show_all_posts(message: Message, state: FSMContext):
 
     await state.update_data(all_posts=all_posts, current_page=0)
     await display_all_posts_page(message, all_posts, 0)
+
 
 async def display_all_posts_page(message: Message, all_posts: list, page: int):
     start_idx = page * POSTS_PER_PAGE
@@ -497,31 +510,41 @@ async def display_all_posts_page(message: Message, all_posts: list, page: int):
         return
 
     # Ro‘yxat matnini shakllantirish
-    response = "\n".join([f"✏{i+1+start_idx}. {post[1]['title']}" for i, post in enumerate(page_posts)])
+    response = "\n".join(
+        [f"✏{i+1+start_idx}. {post[1]['title']}" for i, post in enumerate(page_posts)]
+    )
 
     # Tugmalar
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-    
+
     # Tugmalarni 5 tadan ikki qator qilib joylashtirish
     buttons_rows = []
     current_row = []
     for i, (post_id, _) in enumerate(page_posts):
-        current_row.append(InlineKeyboardButton(text=str(i + 1 + start_idx), callback_data=f"allpost_{post_id}"))
+        current_row.append(
+            InlineKeyboardButton(
+                text=str(i + 1 + start_idx), callback_data=f"allpost_{post_id}"
+            )
+        )
         if len(current_row) == 5:  # Har bir qatorda 5 ta tugma
             buttons_rows.append(current_row)
             current_row = []
     if current_row:  # Qolgan tugmalarni qatorga qo‘shish
         buttons_rows.append(current_row)
-    
+
     # Tugma qatorlarini keyboard’ga qo‘shish
     keyboard.inline_keyboard.extend(buttons_rows)
 
     # Oldingi/Keyingi tugmalari
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton(text="⬅ Oldingi", callback_data=f"allprev_{page}"))
+        nav_buttons.append(
+            InlineKeyboardButton(text="⬅ Oldingi", callback_data=f"allprev_{page}")
+        )
     if end_idx < len(all_posts):
-        nav_buttons.append(InlineKeyboardButton(text="Keyingi ➡", callback_data=f"allnext_{page}"))
+        nav_buttons.append(
+            InlineKeyboardButton(text="Keyingi ➡", callback_data=f"allnext_{page}")
+        )
     if nav_buttons:
         keyboard.inline_keyboard.append(nav_buttons)
 
@@ -530,6 +553,7 @@ async def display_all_posts_page(message: Message, all_posts: list, page: int):
         await message.edit_text(response, reply_markup=keyboard)
     else:
         await message.answer(response, reply_markup=keyboard)
+
 
 @dp.callback_query(lambda c: c.data.startswith(("allpost_", "allprev_", "allnext_")))
 async def handle_all_posts_callbacks(callback: CallbackQuery, state: FSMContext):
@@ -547,11 +571,21 @@ async def handle_all_posts_callbacks(callback: CallbackQuery, state: FSMContext)
             return
 
         if post_data["type"] == "text":
-            await callback.message.answer(post_data["content"], parse_mode="html", disable_web_page_preview=True)
+            await callback.message.answer(
+                post_data["content"], parse_mode="html", disable_web_page_preview=True
+            )
         elif post_data["type"] == "photo":
-            await callback.message.answer_photo(post_data["content"], caption=post_data.get("caption", ""), parse_mode="html")
+            await callback.message.answer_photo(
+                post_data["content"],
+                caption=post_data.get("caption", ""),
+                parse_mode="html",
+            )
         elif post_data["type"] == "video":
-            await callback.message.answer_video(post_data["content"], caption=post_data.get("caption", ""), parse_mode="html")
+            await callback.message.answer_video(
+                post_data["content"],
+                caption=post_data.get("caption", ""),
+                parse_mode="html",
+            )
 
     elif data.startswith("allprev_") or data.startswith("allnext_"):
         current_page = int(data.split("_")[1])
@@ -1215,39 +1249,35 @@ DAY_MAPPING = {
 
 #         await asyncio.sleep(86400)  # 86400
 
+
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=00, microsecond=0)
+        today_scheduled_time = now_uz.replace(hour=4, minute=0, second=0, microsecond=0)
 
-        # Joriy vaqt va keyingi ishga tushish vaqtini tekshirish
-        print(f"Joriy vaqt: {now_uz}, 06:00:59 vaqti: {today_8_11_uz}")
-        
-        if now_uz > today_8_11_uz:
-            next_run = today_8_11_uz + timedelta(days=1)
+        time_diff = (now_uz - today_scheduled_time).total_seconds()
+
+        if time_diff > 3600:
+            # Agar 1 soatdan oshgan bo'lsa, keyingi kunni kutadi
+            next_run = today_scheduled_time + timedelta(days=1)
+            seconds_until_next_run = (next_run - now_uz).total_seconds()
+            print(
+                f"Joriy vaqt {now_uz}, 06:00 dan 1 soatdan ko'p o'tgan, keyingi yuborish: {next_run}"
+            )
         else:
-            next_run = today_8_11_uz
-
-        seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
-        print(
-            f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
-        )
+            # Agar 1 soatdan kam kechikkan bo‘lsa, hozir yuboradi
+            next_run = today_scheduled_time if time_diff < 0 else now_uz
+            seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
+            print(f"Joriy vaqt {now_uz}, yuborish boshlanmoqda!")
 
         await asyncio.sleep(seconds_until_next_run)
 
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
-        print(f"Bugungi kun (EN): {current_day_en}")  # Bugungi kunni tekshirish
-        
         users_ref = db.collection("Users").stream()
-
-        # Barcha postlarni yaratilish vaqti bo‘yicha tartib bilan olish
         all_posts = sorted(
             [post.to_dict() for post in db.collection("posts").stream()],
             key=lambda x: x["created_at"],
         )
-        print(f"Postlar soni: {len(all_posts)}")  # Postlar sonini tekshirish
-        if all_posts:
-            print(f"Birinchi post ID: {all_posts[0]['id']}, Oxirgi post ID: {all_posts[-1]['id']}")  # Postlar diapazonini ko‘rish
 
         if not all_posts:
             print("Post topilmadi!")
@@ -1264,129 +1294,84 @@ async def send_scheduled_posts():
             last_sent = user_data.get("last_sent_date")
             last_post_id = user_data.get("last_post_id", None)
 
-            # Foydalanuvchi ma’lumotlarini tekshirish
-            print(f"Foydalanuvchi {user_id}: frequency={frequency}, last_sent={last_sent}, last_post_id={last_post_id}")
-
             should_send = False
-            if frequency == "daily":
+            if frequency == "daily" or (
+                isinstance(frequency, dict)
+                and "specific_days" in frequency
+                and current_day_en
+                in [DAY_MAPPING[day] for day in frequency["specific_days"]]
+            ):
                 should_send = True
-                print(f"Foydalanuvchi {user_id}: Har kuni yuborish tanlandi")
-            elif frequency == "every_two_days":
-                if last_sent is None:
-                    should_send = True
-                    print(f"Foydalanuvchi {user_id}: Hali xabar yuborilmagan, yuboriladi")
-                else:
-                    try:
-                        last_sent_date = datetime.fromisoformat(last_sent)
-                        days_diff = (datetime.now(UZ_TIMEZONE) - last_sent_date).days
-                        print(f"Foydalanuvchi {user_id}: Oxirgi yuborishdan {days_diff} kun o‘tgan")
-                        if days_diff >= 2:
-                            should_send = True
-                            print(f"Foydalanuvchi {user_id}: 2+ kun o‘tgan, yuboriladi")
-                    except (ValueError, TypeError) as e:
-                        print(f"Foydalanuvchi {user_id}: last_sent format xatosi: {e}")
-            elif isinstance(frequency, dict) and "specific_days" in frequency:
-                specific_days_en = [
-                    DAY_MAPPING[day] for day in frequency["specific_days"]
-                ]
-                print(f"Foydalanuvchi {user_id}: Maxsus kunlar: {specific_days_en}")
-                if current_day_en in specific_days_en:
-                    should_send = True
-                    print(f"Foydalanuvchi {user_id}: Bugun maxsus kun, yuboriladi")
+            elif frequency == "every_two_days" and (
+                last_sent is None
+                or (datetime.now(UZ_TIMEZONE) - datetime.fromisoformat(last_sent)).days
+                >= 2
+            ):
+                should_send = True
 
             if should_send:
-                if last_post_id is None:
-                    post_to_send = all_posts[0]
-                    print(f"Foydalanuvchi {user_id}: Birinchi post yuboriladi: {post_to_send['id']}")
-                else:
-                    last_post_index = next(
-                        (i for i, p in enumerate(all_posts) if p["id"] == last_post_id),
-                        -1,
-                    )
-                    print(f"Foydalanuvchi {user_id}: Oxirgi post indeksi: {last_post_index}")
-                    next_post_index = last_post_index + 1
-                    if next_post_index < len(all_posts):
-                        post_to_send = all_posts[next_post_index]
-                        print(f"Foydalanuvchi {user_id}: Keyingi post yuboriladi: {post_to_send['id']}")
-                    else:
-                        print(f"Foydalanuvchi {user_id}: Yangi post yo‘q, o‘tkazib yuboriladi")
-                        continue
-                users_to_send[user_id] = {"data": user_data, "post": post_to_send}
+                post_to_send = (
+                    all_posts[0]
+                    if last_post_id is None
+                    else next((p for p in all_posts if p["id"] > last_post_id), None)
+                )
+                if post_to_send:
+                    users_to_send[user_id] = {"data": user_data, "post": post_to_send}
 
-        print(f"Yuboriladigan foydalanuvchilar soni: {len(users_to_send)}")
         if not users_to_send:
             print("Yuborish uchun foydalanuvchi yoki yangi post topilmadi!")
             await asyncio.sleep(86400)
             continue
 
-        # Batch qilib yuborish
         user_ids = list(users_to_send.keys())
         for i in range(0, len(user_ids), batch_size):
             batch_users = user_ids[i : i + batch_size]
-            tasks = []
-
-            for user_id in batch_users:
-                user_info = users_to_send[user_id]
-                post_data = user_info["post"]
-                print(f"Foydalanuvchi {user_id}: Post turi: {post_data['type']}, ID: {post_data['id']}")
-                if post_data["type"] == "text":
-                    task = bot.send_message(
+            tasks = [
+                (
+                    bot.send_message(
                         user_id,
-                        post_data["content"],
+                        users_to_send[user_id]["post"]["content"],
                         parse_mode="html",
                         disable_web_page_preview=True,
                     )
-                elif post_data["type"] == "photo":
-                    task = bot.send_photo(
-                        user_id,
-                        post_data["content"],
-                        caption=post_data.get("caption", ""),
-                        parse_mode="html",
-                        disable_web_page_preview=True,
+                    if users_to_send[user_id]["post"]["type"] == "text"
+                    else (
+                        bot.send_photo(
+                            user_id,
+                            users_to_send[user_id]["post"]["content"],
+                            caption=users_to_send[user_id]["post"].get("caption", ""),
+                            parse_mode="html",
+                        )
+                        if users_to_send[user_id]["post"]["type"] == "photo"
+                        else bot.send_video(
+                            user_id,
+                            users_to_send[user_id]["post"]["content"],
+                            caption=users_to_send[user_id]["post"].get("caption", ""),
+                            parse_mode="html",
+                        )
                     )
-                elif post_data["type"] == "video":
-                    task = bot.send_video(
-                        user_id,
-                        post_data["content"],
-                        caption=post_data.get("caption", ""),
-                        parse_mode="html",
-                        disable_web_page_preview=True,
-                    )
-                tasks.append(task)
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for j, result in enumerate(results):
-                if isinstance(result, Exception):
-                    print(f"Foydalanuvchi {batch_users[j]} uchun xato: {result}")
-                else:
-                    print(f"Foydalanuvchi {batch_users[j]} ga xabar muvaffaqiyatli yuborildi")
-
-            # Firestore’ni yangilash
-            batch = db.batch()
-            for user_id in batch_users:
-                user_info = users_to_send[user_id]
-                doc_ref = db.collection("Users").document(str(user_id))
-                batch.update(
-                    doc_ref,
-                    {
-                        "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
-                        "last_post_id": user_info["post"]["id"],
-                        "sent_posts": firestore.ArrayUnion(
-                            [
-                                {
-                                    "id": user_info["post"]["id"],
-                                    "title": user_info["post"]["title"],
-                                }
-                            ]
-                        ),
-                    },
                 )
+                for user_id in batch_users
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            batch = db.batch()
+            for j, user_id in enumerate(batch_users):
+                if not isinstance(results[j], Exception):
+                    doc_ref = db.collection("Users").document(str(user_id))
+                    batch.update(
+                        doc_ref,
+                        {
+                            "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
+                            "last_post_id": users_to_send[user_id]["post"]["id"],
+                        },
+                    )
             batch.commit()
-            print(f"Batch {i // batch_size + 1}: Firestore yangilandi")
-
             await asyncio.sleep(1.5)
 
-        await asyncio.sleep(86400)  # 24 soat kutish
+        await asyncio.sleep(86400)
+
+
+# 24 soat kutish
 
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
