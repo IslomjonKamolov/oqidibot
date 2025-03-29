@@ -1253,32 +1253,36 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_scheduled_time = now_uz.replace(hour=16, minute=0, second=0, microsecond=0)
+        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=00, microsecond=0)
+        one_hour_later = today_8_11_uz + timedelta(hours=1)
 
-        time_diff = (now_uz - today_scheduled_time).total_seconds()
-
-        if time_diff > 3600:
-            # Agar 1 soatdan oshgan bo'lsa, keyingi kunni kutadi
-            next_run = today_scheduled_time + timedelta(days=1)
-            seconds_until_next_run = (next_run - now_uz).total_seconds()
-            print(
-                f"Joriy vaqt {now_uz}, 06:00 dan 1 soatdan ko'p o'tgan, keyingi yuborish: {next_run}"
-            )
+        print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_8_11_uz}")
+        
+        if now_uz > one_hour_later:
+            next_run = today_8_11_uz + timedelta(days=1)
         else:
-            # Agar 1 soatdan kam kechikkan bo‘lsa, hozir yuboradi
-            next_run = today_scheduled_time if time_diff < 0 else now_uz
-            seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
-            print(f"Joriy vaqt {now_uz}, yuborish boshlanmoqda!")
+            next_run = today_8_11_uz
+
+        seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
+        print(f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}")
 
         await asyncio.sleep(seconds_until_next_run)
 
+        if now_uz > one_hour_later:
+            print("1 soatdan oshib ketganligi sababli yuborilmadi")
+            await asyncio.sleep(86400)
+            continue
+
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
+        print(f"Bugungi kun (EN): {current_day_en}")
+        
         users_ref = db.collection("Users").stream()
         all_posts = sorted(
             [post.to_dict() for post in db.collection("posts").stream()],
             key=lambda x: x["created_at"],
         )
-
+        print(f"Postlar soni: {len(all_posts)}")
+        
         if not all_posts:
             print("Post topilmadi!")
             await asyncio.sleep(3600)
@@ -1295,28 +1299,40 @@ async def send_scheduled_posts():
             last_post_id = user_data.get("last_post_id", None)
 
             should_send = False
-            if frequency == "daily" or (
-                isinstance(frequency, dict)
-                and "specific_days" in frequency
-                and current_day_en
-                in [DAY_MAPPING[day] for day in frequency["specific_days"]]
-            ):
+            if frequency == "daily":
                 should_send = True
-            elif frequency == "every_two_days" and (
-                last_sent is None
-                or (datetime.now(UZ_TIMEZONE) - datetime.fromisoformat(last_sent)).days
-                >= 2
-            ):
-                should_send = True
+            elif frequency == "every_two_days":
+                if last_sent is None:
+                    should_send = True
+                else:
+                    try:
+                        last_sent_date = datetime.fromisoformat(last_sent)
+                        days_diff = (datetime.now(UZ_TIMEZONE) - last_sent_date).days
+                        if days_diff >= 2:
+                            should_send = True
+                    except (ValueError, TypeError) as e:
+                        print(f"Foydalanuvchi {user_id}: last_sent format xatosi: {e}")
+            elif isinstance(frequency, dict) and "specific_days" in frequency:
+                specific_days_en = [
+                    DAY_MAPPING[day] for day in frequency["specific_days"]
+                ]
+                if current_day_en in specific_days_en:
+                    should_send = True
 
             if should_send:
-                post_to_send = (
-                    all_posts[0]
-                    if last_post_id is None
-                    else next((p for p in all_posts if p["id"] > last_post_id), None)
-                )
-                if post_to_send:
-                    users_to_send[user_id] = {"data": user_data, "post": post_to_send}
+                if last_post_id is None:
+                    post_to_send = all_posts[0]
+                else:
+                    last_post_index = next(
+                        (i for i, p in enumerate(all_posts) if p["id"] == last_post_id),
+                        -1,
+                    )
+                    next_post_index = last_post_index + 1
+                    if next_post_index < len(all_posts):
+                        post_to_send = all_posts[next_post_index]
+                    else:
+                        continue
+                users_to_send[user_id] = {"data": user_data, "post": post_to_send}
 
         if not users_to_send:
             print("Yuborish uchun foydalanuvchi yoki yangi post topilmadi!")
@@ -1326,46 +1342,66 @@ async def send_scheduled_posts():
         user_ids = list(users_to_send.keys())
         for i in range(0, len(user_ids), batch_size):
             batch_users = user_ids[i : i + batch_size]
-            tasks = [
-                (
-                    bot.send_message(
+            tasks = []
+
+            for user_id in batch_users:
+                user_info = users_to_send[user_id]
+                post_data = user_info["post"]
+                
+                if post_data["type"] == "text":
+                    task = bot.send_message(
                         user_id,
-                        users_to_send[user_id]["post"]["content"],
+                        post_data["content"],
                         parse_mode="html",
                         disable_web_page_preview=True,
                     )
-                    if users_to_send[user_id]["post"]["type"] == "text"
-                    else (
-                        bot.send_photo(
-                            user_id,
-                            users_to_send[user_id]["post"]["content"],
-                            caption=users_to_send[user_id]["post"].get("caption", ""),
-                            parse_mode="html",
-                        )
-                        if users_to_send[user_id]["post"]["type"] == "photo"
-                        else bot.send_video(
-                            user_id,
-                            users_to_send[user_id]["post"]["content"],
-                            caption=users_to_send[user_id]["post"].get("caption", ""),
-                            parse_mode="html",
-                        )
+                elif post_data["type"] == "photo":
+                    task = bot.send_photo(
+                        user_id,
+                        post_data["content"],
+                        caption=post_data.get("caption", ""),
+                        parse_mode="html",
+                        disable_web_page_preview=True,
                     )
-                )
-                for user_id in batch_users
-            ]
+                elif post_data["type"] == "video":
+                    task = bot.send_video(
+                        user_id,
+                        post_data["content"],
+                        caption=post_data.get("caption", ""),
+                        parse_mode="html",
+                        disable_web_page_preview=True,
+                    )
+                tasks.append(task)
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
+            for j, result in enumerate(results):
+                if isinstance(result, Exception):
+                    print(f"Foydalanuvchi {batch_users[j]} uchun xato: {result}")
+                else:
+                    print(f"Foydalanuvchi {batch_users[j]} ga xabar muvaffaqiyatli yuborildi")
+
             batch = db.batch()
-            for j, user_id in enumerate(batch_users):
-                if not isinstance(results[j], Exception):
-                    doc_ref = db.collection("Users").document(str(user_id))
-                    batch.update(
-                        doc_ref,
-                        {
-                            "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
-                            "last_post_id": users_to_send[user_id]["post"]["id"],
-                        },
-                    )
+            for user_id in batch_users:
+                user_info = users_to_send[user_id]
+                doc_ref = db.collection("Users").document(str(user_id))
+                batch.update(
+                    doc_ref,
+                    {
+                        "last_sent_date": datetime.now(UZ_TIMEZONE).isoformat(),
+                        "last_post_id": user_info["post"]["id"],
+                        "sent_posts": firestore.ArrayUnion(
+                            [
+                                {
+                                    "id": user_info["post"]["id"],
+                                    "title": user_info["post"].get("title", ""),
+                                }
+                            ]
+                        ),
+                    },
+                )
             batch.commit()
+            print(f"Batch {i // batch_size + 1}: Firestore yangilandi")
+
             await asyncio.sleep(1.5)
 
         await asyncio.sleep(86400)
