@@ -1253,7 +1253,7 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=00, microsecond=0)
+        today_8_11_uz = now_uz.replace(hour=17, minute=00, second=00, microsecond=0)
         one_hour_later = today_8_11_uz + timedelta(hours=1)
 
         print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_8_11_uz}")
