@@ -1253,38 +1253,33 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=6, minute=00, second=00, microsecond=0)
-        one_hour_later = today_8_11_uz + timedelta(hours=1)
+        today_8_11_uz = now_uz.replace(hour=4, minute=30, second=0, microsecond=0)
 
         print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_8_11_uz}")
-        
-        if now_uz > one_hour_later:
-            next_run = today_8_11_uz + timedelta(days=1)
-        else:
-            next_run = today_8_11_uz
+
+        # Vaqtdan qat'i nazar, har doim xabar yuborish
+        next_run = today_8_11_uz if now_uz < today_8_11_uz else now_uz
 
         seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
-        print(f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}")
+        print(
+            f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
+        )
 
         await asyncio.sleep(seconds_until_next_run)
 
-        if now_uz > one_hour_later:
-            print("1 soatdan oshib ketganligi sababli yuborilmadi")
-            await asyncio.sleep(86400)
-            continue
-
+        # Xabar yuborish jarayoni
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
         print(f"Bugungi kun (EN): {current_day_en}")
-        
+
         users_ref = db.collection("Users").stream()
         all_posts = sorted(
             [post.to_dict() for post in db.collection("posts").stream()],
             key=lambda x: x["created_at"],
         )
         print(f"Postlar soni: {len(all_posts)}")
-        
+
         if not all_posts:
-            print("Post topilmadi!")
+            print("Post topilmadi! 1 soatdan keyin qayta tekshiriladi.")
             await asyncio.sleep(3600)
             continue
 
@@ -1347,7 +1342,7 @@ async def send_scheduled_posts():
             for user_id in batch_users:
                 user_info = users_to_send[user_id]
                 post_data = user_info["post"]
-                
+
                 if post_data["type"] == "text":
                     task = bot.send_message(
                         user_id,
@@ -1378,7 +1373,9 @@ async def send_scheduled_posts():
                 if isinstance(result, Exception):
                     print(f"Foydalanuvchi {batch_users[j]} uchun xato: {result}")
                 else:
-                    print(f"Foydalanuvchi {batch_users[j]} ga xabar muvaffaqiyatli yuborildi")
+                    print(
+                        f"Foydalanuvchi {batch_users[j]} ga xabar muvaffaqiyatli yuborildi"
+                    )
 
             batch = db.batch()
             for user_id in batch_users:
@@ -1404,7 +1401,7 @@ async def send_scheduled_posts():
 
             await asyncio.sleep(1.5)
 
-        await asyncio.sleep(86400)
+        await asyncio.sleep(86400)  # Har kuni qayta ishga tushadi
 
 
 # 24 soat kutish
