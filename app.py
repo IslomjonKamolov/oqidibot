@@ -1254,7 +1254,7 @@ async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
         today_8_11_uz = now_uz.replace(hour=6, minute=0, second=0, microsecond=0)
-
+ 
         print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_8_11_uz}")
 
         # Vaqtdan qat'i nazar, har doim xabar yuborish
