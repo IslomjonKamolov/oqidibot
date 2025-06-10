@@ -78,7 +78,7 @@ users = {}
 
 # WEB HOOK CODES
 WEBHOOK_HOST = (
-    "https://oqidibot-production.up.railway.app"  # ngrok’dan keyin yangilanadi
+    "oqidibot-production-02bf.up.railway.app"  # ngrok’dan keyin yangilanadi
 )
 # WEBHOOK_HOST = (
 #     "https://3e0a-188-113-198-250.ngrok-free.app"  # ngrok’dan keyin yangilanadi
