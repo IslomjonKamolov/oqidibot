@@ -1410,7 +1410,7 @@ async def send_scheduled_posts():
 
 
 # 24 soat kutish
-
+print("hello")
 
 # MAIN FUNCTIONS !!!! DON'T TOUCH !!!!
 
