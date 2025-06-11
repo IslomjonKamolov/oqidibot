@@ -77,11 +77,9 @@ dp = Dispatcher()
 users = {}
 
 # WEB HOOK CODES
-WEBHOOK_HOST = (
-    "oqidibot-production-02bf.up.railway.app"  # ngrok’dan keyin yangilanadi
-)
+WEBHOOK_HOST = "oqidibot-production-02bf.up.railway.app"  # ngrok’dan keyin yangilanadi
 # WEBHOOK_HOST = (
-#     "https://3e0a-188-113-198-250.ngrok-free.app"  # ngrok’dan keyin yangilanadi
+#     "https://549a-188-113-232-172.ngrok-free.app"  # ngrok’dan keyin yangilanadi
 # )
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -1253,20 +1251,27 @@ DAY_MAPPING = {
 async def send_scheduled_posts():
     while True:
         now_uz = datetime.now(UZ_TIMEZONE)
-        today_8_11_uz = now_uz.replace(hour=6, minute=0, second=0, microsecond=0)
- 
-        print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_8_11_uz}")
+        today_6_uz = now_uz.replace(hour=6, minute=0, second=0, microsecond=0)
 
-        # Vaqtdan qat'i nazar, har doim xabar yuborish
-        next_run = today_8_11_uz if now_uz < today_8_11_uz else now_uz
+        print(f"Joriy vaqt: {now_uz}, 06:00:00 vaqti: {today_6_uz}")
 
-        seconds_until_next_run = max((next_run - now_uz).total_seconds(), 0)
-        print(
-            f"Keyingi yuborish: {next_run}, Kutish soniyalari: {seconds_until_next_run}"
-        )
-
-        await asyncio.sleep(seconds_until_next_run)
-
+        # Soat 6 dan o'tib ketgan bo'lsa va 1 soatdan ko'p vaqt o'tgan bo‘lsa
+        if now_uz > today_6_uz:
+            time_diff = (now_uz - today_6_uz).total_seconds()
+            if time_diff > 3600:
+                # Ertangi 06:00ni hisoblash
+                tomorrow_6_uz = today_6_uz + timedelta(days=1)
+                sleep_seconds = (tomorrow_6_uz - now_uz).total_seconds()
+                print(
+                    f"Soat 6 dan {time_diff / 3600:.2f} soat o'tib ketgan. Xabar yuborilmaydi. {sleep_seconds / 3600:.2f} soat uxlanadi."
+                )
+                await asyncio.sleep(sleep_seconds)
+                continue
+        else:
+            # Hali soat 6 bo‘lmagan – shu kungi 6:00gacha uxlaymiz
+            sleep_seconds = (today_6_uz - now_uz).total_seconds()
+            print(f"Soat hali 6 bo‘lmagan. {sleep_seconds / 60:.1f} daqiqa uxlanadi.")
+            await asyncio.sleep(sleep_seconds)
         # Xabar yuborish jarayoni
         current_day_en = datetime.now(UZ_TIMEZONE).strftime("%A")
         print(f"Bugungi kun (EN): {current_day_en}")
