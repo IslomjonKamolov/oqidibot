@@ -1,2 +1,10 @@
 serviceAccount.txt
+# virtual environment
 Bot/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# config files
+.env
